@@ -1,5 +1,9 @@
 export type Status =
-  "waiting" | "in_progress" | "waiting_for_sign_off" | "decided";
+  | "waiting"
+  | "in_progress"
+  | "waiting_for_sign_off"
+  | "decided"
+  | "left_for_handler";
 export type DecisionKind = "approve" | "decline" | "refer";
 export type StepKind = "tool_call" | "tool_result" | "message";
 
@@ -13,6 +17,7 @@ export interface ClaimSummary {
   status: Status;
   decision: DecisionKind | null;
   payout: number | null;
+  attempts: number;
 }
 
 export interface Item {
@@ -103,6 +108,26 @@ export interface Step {
   created_at: string;
 }
 
+export type TodoStatus = "to_do" | "in_progress" | "done" | "left_for_handler";
+
+export interface Todo {
+  todo_id: number;
+  run_id: string;
+  claim_id: string;
+  status: TodoStatus;
+  content: string;
+  updated_at: string;
+}
+
+export interface Run {
+  run_id: string;
+  cap: number;
+  started_at: string;
+  finished_at: string | null;
+  summary: string | null;
+  todos: Todo[];
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -146,6 +171,9 @@ export const api = {
       `/api/customers/${encodeURIComponent(customerId)}/claims`,
     ),
   getInstructions: () => request<{ text: string }>("/api/instructions"),
+  getQueueInstructions: () =>
+    request<{ text: string }>("/api/instructions/queue"),
+  getCurrentRun: () => request<Run>("/api/runs/current"),
   listHandlers: () => request<Handler[]>("/api/handlers"),
   signOff: (claimId: string, handlerId: string) =>
     post<Claim>(`${claimPath(claimId)}/sign-off`, { handler_id: handlerId }),

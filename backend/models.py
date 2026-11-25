@@ -4,9 +4,12 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-Status = Literal["waiting", "in_progress", "waiting_for_sign_off", "decided"]
+Status = Literal[
+    "waiting", "in_progress", "waiting_for_sign_off", "decided", "left_for_handler"
+]
 DecisionKind = Literal["approve", "decline", "refer"]
 StepKind = Literal["tool_call", "tool_result", "message"]
+TodoStatus = Literal["to_do", "in_progress", "done", "left_for_handler"]
 
 
 class Item(BaseModel):
@@ -45,6 +48,7 @@ class ClaimSummary(BaseModel):
     status: Status
     decision: DecisionKind | None
     payout: float | None
+    attempts: int = 0
 
 
 class Claim(BaseModel):
@@ -65,6 +69,7 @@ class Claim(BaseModel):
     thread_id: str | None
     decision: Decision | None
     payment: Payment | None
+    attempts: int = 0
 
 
 class Trip(BaseModel):
@@ -152,3 +157,47 @@ class PaymentRequest(BaseModel):
 
 class SignOffRequest(BaseModel):
     handler_id: str
+
+
+class Todo(BaseModel):
+    todo_id: int
+    run_id: str
+    claim_id: str
+    status: TodoStatus
+    content: str
+    updated_at: str
+
+
+class Run(BaseModel):
+    run_id: str
+    cap: int
+    started_at: str
+    finished_at: str | None
+    summary: str | None
+    todos: list[Todo] = []
+
+
+class Sections(BaseModel):
+    wording: list[str]
+    manual: list[str]
+
+
+class StartRunRequest(BaseModel):
+    cap: int = Field(ge=0, description="0 means no cap")
+
+
+class TodoRequest(BaseModel):
+    claim_id: str = Field(min_length=1)
+    content: str = Field(min_length=1)
+
+
+class TodoStatusRequest(BaseModel):
+    status: TodoStatus
+
+
+class FinishRequest(BaseModel):
+    summary: str = Field(min_length=1)
+
+
+class FailureRequest(BaseModel):
+    reason: str = Field(min_length=1)

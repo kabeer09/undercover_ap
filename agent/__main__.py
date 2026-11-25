@@ -1,17 +1,19 @@
-"""Work the queue with the UnderCover Agent: uv run -m agent [CLM-1001]"""
+"""Work the queue with the UnderCover Agent: uv run -m agent [--cap N] [CLM-1001]"""
 
 import sys
 import uuid
 
-from agent.main import run, work_queue
+from agent.main import run, run_queue
 
 
 def main(args: list[str]) -> None:
-    """Work the claim named on the command line, or every waiting claim."""
-    if args:
+    """Work one claim, or the queue, capped at a number of claims if asked."""
+    if args and args[0] == "--cap":
+        run_queue(int(args[1]))
+    elif args:
         print(run(args[0], str(uuid.uuid4())))
     else:
-        work_queue()
+        run_queue()
 
 
 if __name__ == "__main__":

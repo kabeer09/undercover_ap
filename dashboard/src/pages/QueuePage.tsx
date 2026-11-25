@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { api, type Status } from "../api";
 import { DecisionChip, StatusChip } from "../components/Chips";
 import { Message } from "../components/Message";
-import { date, label, money, statusLabels } from "../format";
+import { date, label, money, statusLabels, todoLabels } from "../format";
 import { REFRESH_MS, useLoad } from "../useLoad";
 
 const states: Status[] = [
@@ -10,10 +10,12 @@ const states: Status[] = [
   "in_progress",
   "waiting_for_sign_off",
   "decided",
+  "left_for_handler",
 ];
 
 export function QueuePage() {
   const { data: claims, error } = useLoad(api.listClaims, REFRESH_MS);
+  const { data: run } = useLoad(api.getCurrentRun, REFRESH_MS);
   if (!claims) return <Message error={error} />;
 
   return (
@@ -33,6 +35,24 @@ export function QueuePage() {
             </div>
           );
         })}
+      </section>
+      <section className="panel" aria-label="Agent's to-do list">
+        <h2>Agent's to-do list</h2>
+        {run?.todos.length ? (
+          <ul className="todo-list">
+            {run.todos.map((todo) => (
+              <li key={todo.todo_id}>
+                <Link className="mono" to={`/claims/${todo.claim_id}`}>
+                  {todo.claim_id}
+                </Link>{" "}
+                <span>{todo.content}</span>{" "}
+                <span className="chip">{todoLabels[todo.status]}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No run has started yet.</p>
+        )}
       </section>
       <section className="panel table-scroll">
         <table className="table">

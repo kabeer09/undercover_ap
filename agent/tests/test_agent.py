@@ -59,6 +59,7 @@ def test_tools_are_named_after_backend_operations(client):
         "get_claim",
         "get_policy",
         "get_claim_history",
+        "get_sections",
         "record_decision",
         "pay_claim",
     ]
@@ -168,6 +169,6 @@ def test_command_line(monkeypatch, capsys):
 def test_model_name(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.delenv("MODEL_NAME", raising=False)
-    assert main.model().model_name == "openai/gpt-6-luna"
+    assert main.model().model_name == "deepseek/deepseek-v4.1-flash"
     monkeypatch.setenv("MODEL_NAME", "openrouter/free")
     assert main.model().model_name == "openrouter/free"

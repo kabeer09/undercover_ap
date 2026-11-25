@@ -14,11 +14,14 @@ def backend() -> httpx.Client:
 
 
 def request(
-    method: str, path: str, body: dict[str, Any] | None = None
+    method: str,
+    path: str,
+    body: dict[str, Any] | None = None,
+    params: dict[str, str] | None = None,
 ) -> httpx.Response:
     """Send one request to the backend."""
     with backend() as client:
-        return client.request(method, path, json=body)
+        return client.request(method, path, json=body, params=params)
 
 
 def reply(response: httpx.Response) -> str:
@@ -70,4 +73,73 @@ def pay_claim(claim_id: str, amount: float) -> str:
     return reply(request("POST", f"/api/claims/{claim_id}/payment", {"amount": amount}))
 
 
-TOOLS = [get_claim, get_policy, get_claim_history, record_decision, pay_claim]
+@tool
+def get_sections(names: str) -> str:
+    """Get only the named sections of the policy wording and the claims manual."""
+    response = request("GET", "/api/sections", None, {"names": names})
+    return reply(response)
+
+
+@tool
+def list_claims() -> str:
+    """List the waiting claims and what has been decided on them."""
+    return reply(request("GET", "/api/claims"))
+
+
+@tool
+def add_todo(claim_id: str, content: str) -> str:
+    """Add one claim to the current run's to-do list."""
+    run = call("GET", "/api/runs/current")
+    return reply(
+        request(
+            "POST",
+            f"/api/runs/{run['run_id']}/todos",
+            {"claim_id": claim_id, "content": content},
+        )
+    )
+
+
+@tool
+def update_todo(claim_id: str, status: str) -> str:
+    """Update the to-do item for one claim in the current run."""
+    run = call("GET", "/api/runs/current")
+    for todo in run["todos"]:
+        if todo["claim_id"] == claim_id:
+            return reply(
+                request("POST", f"/api/todos/{todo['todo_id']}", {"status": status})
+            )
+    return f"No to-do item for {claim_id}"
+
+
+@tool
+def check_queue() -> str:
+    """List the claims still waiting in the queue."""
+    return reply(request("GET", "/api/claims"))
+
+
+@tool
+def finish_run(summary: str) -> str:
+    """Finish the current run with a short summary for the handlers."""
+    run = call("GET", "/api/runs/current")
+    return reply(
+        request("POST", f"/api/runs/{run['run_id']}/finish", {"summary": summary})
+    )
+
+
+def call(method: str, path: str) -> Any:
+    """Call the backend and return its JSON, raising if it refuses."""
+    response = request(method, path)
+    if response.is_error:
+        raise RuntimeError(f"{response.status_code}: {response.text}")
+    return response.json()
+
+
+TOOLS = [
+    get_claim,
+    get_policy,
+    get_claim_history,
+    get_sections,
+    record_decision,
+    pay_claim,
+]
+QUEUE_TOOLS = [list_claims, add_todo, update_todo, check_queue, finish_run]

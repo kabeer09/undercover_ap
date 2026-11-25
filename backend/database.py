@@ -13,7 +13,8 @@ DATA = ROOT / "data"
 SCHEMA = """
 CREATE TABLE settings (
     payout_approval_limit REAL NOT NULL,
-    policy_wording TEXT NOT NULL
+    policy_wording TEXT NOT NULL,
+    claims_manual TEXT NOT NULL
 );
 CREATE TABLE handlers (
     handler_id TEXT PRIMARY KEY,
@@ -35,7 +36,23 @@ CREATE TABLE claims (
     customer_id TEXT NOT NULL REFERENCES customers,
     record TEXT NOT NULL,
     status TEXT NOT NULL,
-    thread_id TEXT
+    thread_id TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE runs (
+    run_id TEXT PRIMARY KEY,
+    cap INTEGER NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    summary TEXT
+);
+CREATE TABLE todos (
+    todo_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL REFERENCES runs,
+    claim_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    content TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 CREATE TABLE decisions (
     claim_id TEXT PRIMARY KEY REFERENCES claims,
@@ -61,7 +78,7 @@ CREATE TABLE steps (
 );
 CREATE VIEW claim_view AS
 SELECT
-    claims.claim_id, claims.record, claims.status, claims.thread_id,
+    claims.claim_id, claims.record, claims.status, claims.thread_id, claims.attempts,
     customers.name AS customer_name,
     decisions.decision, decisions.payout, decisions.section, decisions.reason,
     decisions.decided_at,
@@ -98,12 +115,13 @@ def seed(path: Path) -> dict[str, int]:
     policies = load("policies.json")
     claims = load("claims.json")
     wording = (DATA / "policy_wording.md").read_text(encoding="utf-8")
+    manual = (DATA / "claims_manual.md").read_text(encoding="utf-8")
     path.unlink(missing_ok=True)
     with closing(sqlite3.connect(path)) as connection, connection:
         connection.executescript(SCHEMA)
         connection.execute(
-            "INSERT INTO settings VALUES (?, ?)",
-            (company["payout_approval_limit"], wording),
+            "INSERT INTO settings VALUES (?, ?, ?)",
+            (company["payout_approval_limit"], wording, manual),
         )
         connection.executemany(
             "INSERT INTO handlers VALUES (?, ?, ?, ?)",
@@ -121,7 +139,9 @@ def seed(path: Path) -> dict[str, int]:
             [(p["policy_id"], json.dumps(p)) for p in policies],
         )
         connection.executemany(
-            "INSERT INTO claims VALUES (?, ?, ?, 'waiting', NULL)",
+            "INSERT INTO claims"
+            " (claim_id, customer_id, record, status, thread_id, attempts)"
+            " VALUES (?, ?, ?, 'waiting', NULL, 0)",
             [(c["claim_id"], c["customer_id"], json.dumps(c)) for c in claims],
         )
     return {

@@ -68,6 +68,7 @@ export const summary: ClaimSummary = {
   status: "waiting",
   decision: null,
   payout: null,
+  attempts: 0,
 };
 
 export const policy: Policy = {
