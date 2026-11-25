@@ -166,6 +166,14 @@ def test_command_line(monkeypatch, capsys):
     assert len(runs[0][1]) == 36
 
 
+def test_model_base_url(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(main, "OPENROUTER_BASE_URL", "http://localhost:11434/v1")
+    assert str(main.model().openai_api_base).rstrip("/") == (
+        "http://localhost:11434/v1"
+    )
+
+
 def test_model_name(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.delenv("MODEL_NAME", raising=False)

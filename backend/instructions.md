@@ -43,4 +43,4 @@ Call `record_decision` with:
 
 For an approval, then call `pay_claim` with the payout. A large payout needs a handler's sign-off before it is paid. If `pay_claim` says so, that is expected: the payment waits for the handler, and you should not try again.
 
-Finish with one line: the claim id, the decision, the payout, or what went wrong.
+Finish with one line and no analysis: the claim id, the decision, the payout, or what went wrong. Record the decision before you reply.

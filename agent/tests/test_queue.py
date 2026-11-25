@@ -89,14 +89,15 @@ def test_a_failed_claim_does_not_stop_the_run(monkeypatch, client, three_waiting
             )
             return "CLM-1001 failed: Model timed out"
         decide(client, claim_id)
+        main.set_todo(claim_id, "done")
         return f"{claim_id} decline $0.00"
 
     monkeypatch.setattr(main, "work_claim", work)
     main.run_queue(2, stub)
 
     claims = {c["claim_id"]: c for c in client.get("/api/claims").json()}
-    assert claims["CLM-1001"]["status"] == "waiting"
-    assert claims["CLM-1001"]["attempts"] == 1
+    assert claims["CLM-1001"]["status"] == "left_for_handler"
+    assert claims["CLM-1001"]["attempts"] == 2
     assert claims["CLM-1002"]["status"] == "decided"
     assert claims["CLM-1003"]["status"] == "waiting"
 
@@ -121,16 +122,6 @@ def test_failed_claim_is_retried_and_twice_is_left_for_a_handler(
     monkeypatch.setattr(main, "work_claim", work)
     main.run_queue(1, stub)
 
-    claim = client.get("/api/claims/CLM-1001").json()
-    assert claim["attempts"] == 1
-    assert claim["status"] == "waiting"
-
-    stub2 = queue_stub(
-        call("add_todo", claim_id="CLM-1001", content="Decide CLM-1001"),
-        call("work_claim", claim_id="CLM-1001"),
-    )
-    monkeypatch.setattr(main, "work_claim", work)
-    main.run_queue(1, stub2)
     claim = client.get("/api/claims/CLM-1001").json()
     assert claim["attempts"] == 2
     assert claim["status"] == "left_for_handler"
@@ -176,6 +167,20 @@ def test_one_claim_is_never_decided_twice(client, three_waiting):
         ).status_code
         == 409
     )
+
+
+def test_an_undecided_helper_returns_the_claim_to_the_queue(
+    monkeypatch, client, three_waiting
+):
+    client.post("/api/runs", json={"cap": 1})
+    monkeypatch.setattr(
+        main, "run", lambda claim_id, thread_id, llm=None: "I thought about it."
+    )
+    line = main.work_claim("CLM-1001")
+    assert "failed: no decision recorded" in line
+    claim = client.get("/api/claims/CLM-1001").json()
+    assert claim["status"] == "waiting"
+    assert claim["attempts"] == 1
 
 
 def test_command_line_cap(monkeypatch):

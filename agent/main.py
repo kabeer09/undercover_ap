@@ -19,7 +19,7 @@ from agent.tools import QUEUE_TOOLS, TOOLS, request
 
 load_dotenv(override=True)
 
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_BASE_URL = os.getenv("MODEL_BASE_URL", "https://openrouter.ai/api/v1")
 DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash"
 
 
@@ -73,7 +73,7 @@ def run(claim_id: str, thread_id: str, llm: BaseChatModel | None = None) -> str:
     )
     states = agent.stream(
         {"messages": [{"role": "user", "content": f"Claim {claim_id}"}]},
-        config={"configurable": {"thread_id": thread_id}},
+        config={"configurable": {"thread_id": thread_id}, "recursion_limit": 120},
         stream_mode="values",
     )
     messages = next(states)["messages"]
@@ -102,7 +102,7 @@ def work_claim(claim_id: str, llm: BaseChatModel | None = None) -> str:
     """Give one claim to a fresh helper and report its decision, payout or problem."""
     set_todo(claim_id, "in_progress")
     try:
-        reply = run(claim_id, str(uuid.uuid4()), llm)
+        run(claim_id, str(uuid.uuid4()), llm)
     except Exception as error:  # a failed claim must not stop the run
         call_backend(
             "POST",
@@ -110,11 +110,16 @@ def work_claim(claim_id: str, llm: BaseChatModel | None = None) -> str:
             {"reason": str(error)},
         )
         return f"{claim_id} failed: {error}"
-    set_todo(claim_id, "done")
     claim = call_backend("GET", f"/api/claims/{claim_id}")
     decision = claim["decision"]
     if decision is None:
-        return f"{claim_id} undecided: {reply}"
+        call_backend(
+            "POST",
+            f"/api/claims/{claim_id}/failure",
+            {"reason": "The helper finished without recording a decision"},
+        )
+        return f"{claim_id} failed: no decision recorded"
+    set_todo(claim_id, "done")
     return f"{claim_id} {decision['decision']} ${decision['payout']:,.2f}"
 
 
@@ -126,7 +131,13 @@ def missed_claims(cap: int = 0) -> list[str]:
         if claim["status"] == "waiting"
     ]
     if cap:
-        worked = len(call_backend("GET", "/api/runs/current")["todos"])
+        worked = len(
+            [
+                todo
+                for todo in call_backend("GET", "/api/runs/current")["todos"]
+                if todo["status"] == "done"
+            ]
+        )
         waiting = waiting[: max(0, cap - worked)]
     return waiting
 
@@ -151,7 +162,10 @@ def run_queue(cap: int = 0, llm: BaseChatModel | None = None) -> str:
     task = f"Work the queue, capped at {cap or 'all waiting'} claims."
     states = agent.stream(
         {"messages": [{"role": "user", "content": task}]},
-        config={"configurable": {"thread_id": str(uuid.uuid4())}},
+        config={
+            "configurable": {"thread_id": str(uuid.uuid4())},
+            "recursion_limit": 80,
+        },
         stream_mode="values",
     )
     messages = next(states)["messages"]
