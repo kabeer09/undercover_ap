@@ -118,11 +118,33 @@ def test_sections_are_looked_up_not_handed_whole(client):
     )
     assert response.status_code == 200
     data = response.json()
-    assert len(data["wording"]) == 1
-    assert data["wording"][0].startswith("## 5. Baggage and Personal Effects")
-    assert len(data["manual"]) == 1
-    assert data["manual"][0].startswith("## 7. Interpretation notes")
+    assert any(
+        section.startswith("## 5. Baggage and Personal Effects")
+        for section in data["wording"]
+    )
+    assert any(
+        section.startswith("## 7. Interpretation notes") for section in data["manual"]
+    )
     assert "## 2. Trip Cancellation" not in str(data)
+
+
+def test_section_lookup_tolerates_approximate_names(client):
+    response = client.get(
+        "/api/sections", params={"names": "Section 5, 5. Baggage, not a section"}
+    )
+    data = response.json()
+    assert any(
+        section.startswith("## 5. Baggage and Personal Effects")
+        for section in data["wording"]
+    )
+    assert any(
+        section.startswith("## 5. Documents and document requests")
+        for section in data["manual"]
+    )
+
+    unknown = client.get("/api/sections", params={"names": "99. Nothing"}).json()
+    assert unknown["wording"][0].startswith("Available sections:")
+    assert "2. Trip Cancellation and Interruption" in unknown["wording"][0]
 
 
 def test_instructions_come_from_the_documents_not_the_evaluations(client):

@@ -78,14 +78,25 @@ def approval_limit(db: sqlite3.Connection) -> float:
 
 
 def sections(text: str, names: str) -> list[str]:
-    """Return only the named sections of a document, with their headings."""
-    wanted = {name.strip() for name in names.split(",") if name.strip()}
+    """Return only the named sections, or the headings to choose from."""
+    wanted = {
+        name.strip().removeprefix("Section ")
+        for name in names.split(",")
+        if name.strip()
+    }
     parts = text.split("\n## ")
-    return [
-        "## " + part.strip()
-        for part in parts[1:]
-        if part.split("\n")[0].strip() in wanted
-    ]
+    headings = {part.split("\n")[0].strip(): "## " + part.strip() for part in parts[1:]}
+    found: list[str] = []
+    for name in wanted:
+        number = name.split(".", 1)[0]
+        for heading, section in headings.items():
+            if (
+                heading == name or heading.startswith(f"{number}.")
+            ) and section not in found:
+                found.append(section)
+    if not found:
+        return ["Available sections: " + ", ".join(headings)]
+    return found
 
 
 def to_todo(row: sqlite3.Row) -> Todo:

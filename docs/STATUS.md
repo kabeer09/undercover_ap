@@ -23,4 +23,4 @@ The claims pilot in `docs/PLAN.md` is built, and the harness in `docs/HARNESS.md
 
 ## Last live run
 
-To be filled in after the capped run on the default model.
+A capped run on the default model was attempted after reseeding. It created a five-item to-do list and decided CLM-1001 (approve, $420.00, paid) before OpenRouter refused further calls with 402: this account's remaining credits could not cover the in-flight requests. The other four claims stayed waiting. No decisions were scored against `data/evals/`. A live run needs more OpenRouter credit, or a free model through `MODEL_NAME` after the daily allowance resets. All product behavior is covered by the stub-model tests and the checks below.
