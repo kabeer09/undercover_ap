@@ -399,12 +399,14 @@ def claim_graph(
             call_model,
             llm=llm.bind_tools(tools),
             instructions=SystemMessage(
-                "You are a claims handler at UnderCover Travel Insurance. "
-                "Decide the claim using the policy wording, the claims manual and "
-                "the customer's policy record. Use the tools to look things up. "
-                "You MUST finish by calling the record_decision tool with your "
-                "decision, payout and rationale. Never ask for confirmation and "
-                "never end with a text answer alone."
+                instructions
+                + (
+                    "\nYou MUST finish by calling the record_decision tool with "
+                    "your decision, payout and rationale. Never ask for "
+                    "confirmation and never end with a text answer alone."
+                    if os.getenv("LOCAL_MODEL")
+                    else ""
+                )
             ),
         ),
     )
